@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de QR Code Dinâmico</title>
+    <meta name="author" content="Onivaldo Miquelino"> 
+    <!-- Carrega Tailwind CSS para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Estilos personalizados */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .main-card {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .qr-placeholder {
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff;
+            border: 2px dashed #9ca3af; 
+        }
+        /* Aplica estilos responsivos e modernos aos inputs */
+        .form-input, .form-select, .form-textarea {
+            @apply mt-1 w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 ease-in-out;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-4xl mx-auto main-card bg-white rounded-xl p-6 md:p-10">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">QR Code Generator Pro</h1>
+        <p class="text-gray-600 mb-8 text-center">Crie QR Codes dinâmicos e funcionais. As opções de entrada e a explicação mudam de acordo com o tipo escolhido.</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Coluna de Opções e Entradas -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-indigo-50 p-4 rounded-xl shadow-md">
+                    <label for="qr-type" class="block text-sm font-semibold text-indigo-700 mb-2">1. Escolha o Tipo de Conteúdo</label>
+                    <!-- Vinculação direta do onchange para máxima compatibilidade -->
+                    <select id="qr-type" onchange="handleTypeChange()" class="form-select text-gray-700 bg-white">
+                        <option value="" disabled selected>-- Selecione um Tipo --</option>
+                        <option value="url">URL (Link)</option>
+                        <option value="text">Texto Simples</option>
+                        <option value="email">E-mail</option>
+                        <option value="wifi">Wi-Fi</option>
+                        <option value="vcard">vCard (Contato)</option>
+                        <option value="sms">SMS</option>
+                        <option value="location">Localização (Geo)</option>
+                        <option value="pix">Pagamento (Chave Pix/BR Code)</option>
+                        <option value="event">Evento (Calendário)</option>
+                        <option value="social">Rede Social</option>
+                        <option value="pdf">PDF (Link de Download)</option>
+                        <option value="app">Aplicativo (Link da Loja)</option>
+                    </select>
+                </div>
+                
+                <!-- Caixa de Explicação Dinâmica -->
+                <div id="explanation-box" class="bg-blue-100 border-l-4 border-blue-500 text-blue-800 p-4 rounded-lg hidden">
+                    <div class="font-bold text-sm mb-1">O que este QR faz?</div>
+                    <p id="explanation-text" class="text-sm"></p>
+                </div>
+
+                <!-- Campos de Entrada Dinâmicos -->
+                <form id="qr-form" onsubmit="generateQRCode(event)" class="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-inner">
+                    <h2 class="text-lg font-semibold text-gray-700">2. Insira os Dados Necessários</h2>
+                    
+                    <div id="dynamic-fields" class="space-y-4">
+                        <p class="text-gray-500 text-sm italic">Selecione um tipo de conteúdo acima para carregar os campos de preenchimento.</p>
+                    </div>
+
+                    <div id="error-message" class="text-red-600 font-medium hidden"></div>
+
+                    <!-- Opções Opcionais -->
+                    <div class="pt-4 border-t border-gray-100">
+                        <label for="qr-size" class="block text-sm font-medium text-gray-700">Tamanho do QR Code (px):</label>
+                        <input type="number" id="qr-size" value="250" min="100" max="1000" class="form-input w-full sm:w-1/2">
+                    </div>
+
+                    <button type="submit" id="generate-button" class="w-full bg-indigo-600 text-white p-3 rounded-lg font-bold hover:bg-indigo-700 transition duration-200 ease-in-out disabled:bg-gray-400" disabled>
+                        Gerar QR Code
+                    </button>
+                </form>
+
+            </div>
+
+            <!-- Coluna de Resultado do QR Code -->
+            <div class="lg:col-span-1 space-y-4">
+                <h2 class="text-lg font-semibold text-gray-700">3. Prévia e Download</h2>
+                
+                <div id="qr-result" class="qr-placeholder rounded-xl p-4 shadow-md">
+                    <p class="text-gray-500 text-center text-sm">O QR Code gerado aparecerá aqui.</p>
+                </div>
+
+                <a id="download-link" href="#" download="qrcode.png" class="hidden w-full text-center bg-green-600 text-white p-3 rounded-lg font-bold hover:bg-green-700 transition duration-200 ease-in-out">
+                    Baixar QR Code (PNG)
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- O SCRIPT ESTÁ NO FINAL DO BODY PARA GARANTIR QUE OS ELEMENTOS ESTEJAM DEFINIDOS -->
+    <script>
+        // Definição do objeto de URL base, para reuso e compatibilidade máxima
+        const URL_CONFIG = {
+            fields: [{ name: 'url', label: 'Endereço URL (http://...)', type: 'url', required: true }],
+            formatter: (data) => data.url
+        };
+
+        // Mapeamento de tipos de conteúdo e seus campos (sem o operador spread "...")
+        const CONTENT_TYPES = {
+            'url': {
+                label: 'URL',
+                explanation: 'Abre automaticamente um link no navegador do usuário.',
+                fields: URL_CONFIG.fields,
+                formatter: URL_CONFIG.formatter
+            },
+            'text': {
+                label: 'Texto Simples',
+                explanation: 'Exibe uma mensagem curta. Ótimo para senhas ou IDs de texto.',
+                fields: [{ name: 'text', label: 'Mensagem (Máx 200 caracteres)', type: 'textarea', required: true }],
+                formatter: (data) => data.text
+            },
+            'vcard': {
+                label: 'vCard (Contato)',
+                explanation: 'Permite salvar suas informações de contato (Nome, telefone, e-mail) diretamente na agenda do celular.',
+                fields: [
+                    { name: 'name', label: 'Nome Completo', type: 'text', required: true },
+                    { name: 'phone', label: 'Telefone', type: 'tel', required: true },
+                    { name: 'email', label: 'E-mail', type: 'email', required: false },
+                    { name: 'org', label: 'Organização/Empresa', type: 'text', required: false }
+                ],
+                formatter: (data) => {
+                    return `BEGIN:VCARD\nVERSION:3.0\nFN:${data.name}\nTEL:${data.phone}\n${data.email ? `EMAIL:${data.email}\n` : ''}${data.org ? `ORG:${data.org}\n` : ''}END:VCARD`;
+                }
+            },
+            'email': {
+                label: 'E-mail',
+                explanation: 'Abre o aplicativo de e-mail com o destinatário e o assunto preenchidos.',
+                fields: [
+                    { name: 'to', label: 'Destinatário (E-mail)', type: 'email', required: true },
+                    { name: 'subject', label: 'Assunto', type: 'text', required: false },
+                    { name: 'body', label: 'Corpo da Mensagem', type: 'textarea', required: false }
+                ],
+                formatter: (data) => {
+                    let mailto = `mailto:${data.to}`;
+                    const params = [];
+                    if (data.subject) params.push(`subject=${encodeURIComponent(data.subject)}`);
+                    if (data.body) params.push(`body=${encodeURIComponent(data.body)}`);
+                    return params.length > 0 ? mailto + '?' + params.join('&') : mailto;
+                }
+            },
+            'wifi': {
+                label: 'Wi-Fi',
+                explanation: 'Conecta o usuário à rede Wi-Fi sem precisar digitar a senha. Escolha "nopass" se for uma rede aberta.',
+                fields: [
+                    { name: 'ssid', label: 'Nome da Rede (SSID)', type: 'text', required: true },
+                    { name: 'password', label: 'Senha da Rede', type: 'password', required: false },
+                    { name: 'encryption', label: 'Tipo de Criptografia', type: 'select', options: ['WPA', 'WEP', 'nopass'], required: true, default: 'WPA' }
+                ],
+                formatter: (data) => {
+                    const encType = data.encryption === 'nopass' ? '' : `T:${data.encryption};`;
+                    return `WIFI:${encType}S:${data.ssid};P:${data.password || ''};;`;
+                }
+            },
+            'sms': {
+                label: 'SMS',
+                explanation: 'Abre a caixa de mensagens do celular com o número e o texto prontos para envio.',
+                fields: [
+                    { name: 'phone', label: 'Número de Telefone', type: 'tel', required: true },
+                    { name: 'message', label: 'Mensagem Pré-escrita', type: 'textarea', required: false }
+                ],
+                formatter: (data) => {
+                    return `smsto:${data.phone}:${data.message || ''}`;
+                }
+            },
+            'location': {
+                label: 'Localização',
+                explanation: 'Abre um mapa (Google Maps, etc.) na latitude e longitude especificadas. Use o formato: 34.0522, -118.2437',
+                fields: [
+                    { name: 'latitude', label: 'Latitude', type: 'text', required: true },
+                    { name: 'longitude', label: 'Longitude', type: 'text', required: true }
+                ],
+                formatter: (data) => `geo:${data.latitude},${data.longitude}`
+            },
+            'pix': {
+                label: 'Pagamento (Chave Pix/BR Code)',
+                explanation: 'Insira o BR Code completo (o texto do código de pagamento Pix) gerado pela sua instituição financeira.',
+                fields: [
+                    { name: 'pix_key', label: 'BR Code (Payload PIX) ou Chave Pix', type: 'textarea', required: true }
+                ],
+                formatter: (data) => data.pix_key
+            },
+            'event': {
+                label: 'Evento (Calendário)',
+                explanation: 'Salva os detalhes do evento (datas, local) no calendário do usuário. As datas devem ser em formato local.',
+                fields: [
+                    { name: 'title', label: 'Nome do Evento', type: 'text', required: true },
+                    { name: 'start', label: 'Início (Data e Hora)', type: 'datetime-local', required: true },
+                    { name: 'end', label: 'Fim (Data e Hora)', type: 'datetime-local', required: true },
+                    { name: 'location', label: 'Local do Evento', type: 'text', required: false }
+                ],
+                formatter: (data) => {
+                    // Formato vEvent - requer conversão para o formato UTC básico
+                    const formatDateTime = (dt) => {
+                        if (!dt) return '';
+                        const date = new Date(dt);
+                        const year = date.getUTCFullYear().toString().padStart(4, '0');
+                        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+                        const day = date.getUTCDate().toString().padStart(2, '0');
+                        const hours = date.getUTCHours().toString().padStart(2, '0');
+                        const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+                        const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+                        return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+                    };
+
+                    return `BEGIN:VEVENT\nSUMMARY:${data.title}\nDTSTART:${formatDateTime(data.start)}\nDTEND:${formatDateTime(data.end)}\n${data.location ? `LOCATION:${data.location}\n` : ''}END:VEVENT`;
+                }
+            },
+            // Reutilizando URL_CONFIG diretamente sem spread
+            'social': { 
+                label: 'Rede Social', 
+                explanation: 'Direciona para o perfil da sua rede social favorita.', 
+                fields: URL_CONFIG.fields, 
+                formatter: URL_CONFIG.formatter 
+            },
+            'pdf': { 
+                label: 'PDF', 
+                explanation: 'Direciona para o link direto de download do arquivo PDF (a URL deve ser acessível publicamente).', 
+                fields: URL_CONFIG.fields, 
+                formatter: URL_CONFIG.formatter 
+            },
+            'app': { 
+                label: 'Aplicativo', 
+                explanation: 'Direciona para o link do aplicativo na App Store ou Google Play.', 
+                fields: URL_CONFIG.fields, 
+                formatter: URL_CONFIG.formatter 
+            }
+        };
+
+        /**
+         * Gera o HTML dos campos de formulário.
+         * @param {string} type - O tipo de QR Code selecionado.
+         */
+        function generateFieldsHTML(type) {
+            const config = CONTENT_TYPES[type];
+            if (!config) return '';
+
+            let html = '';
+            config.fields.forEach(field => {
+                const requiredAttr = field.required ? 'required' : '';
+                const asterisk = field.required ? '<span class="text-red-500">*</span>' : '';
+
+                html += `
+                    <div class="field-group">
+                        <label for="${field.name}" class="block text-sm font-medium text-gray-700">${field.label} ${asterisk}</label>
+                `;
+
+                if (field.type === 'textarea') {
+                    html += `<textarea id="${field.name}" name="${field.name}" rows="3" class="form-textarea" ${requiredAttr}></textarea>`;
+                } else if (field.type === 'select') {
+                    html += `<select id="${field.name}" name="${field.name}" class="form-select" ${requiredAttr}>`;
+                    field.options.forEach(option => {
+                        const selected = option === field.default ? 'selected' : '';
+                        html += `<option value="${option}" ${selected}>${option}</option>`;
+                    });
+                    html += `</select>`;
+                } else {
+                    html += `<input type="${field.type}" id="${field.name}" name="${field.name}" class="form-input" ${requiredAttr}>`;
+                }
+
+                html += `</div>`;
+            });
+
+            return html;
+        }
+
+        /**
+         * Converte a URL da API em Blob para download.
+         */
+        async function downloadQRCode(url, filename) {
+            const downloadLink = document.getElementById('download-link');
+            const errorMessage = document.getElementById('error-message');
+
+            try {
+                const cleanUrl = url.replace(/&t=\d+$/, ''); 
+                downloadLink.textContent = "Preparando Download...";
+                
+                const response = await fetch(cleanUrl);
+                if (!response.ok) throw new Error('Falha ao buscar a imagem da API.');
+                
+                const blob = await response.blob();
+                const objectURL = URL.createObjectURL(blob);
+                
+                downloadLink.href = objectURL;
+                downloadLink.download = filename;
+                downloadLink.classList.remove('hidden');
+                downloadLink.textContent = "Baixar QR Code (PNG)";
+
+            } catch (error) {
+                console.error("Erro ao preparar download:", error);
+                errorMessage.textContent = "Falha ao preparar o link de download. Verifique a URL do QR Code.";
+                errorMessage.classList.remove('hidden');
+                downloadLink.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Função principal para gerar e exibir o QR Code.
+         */
+        function generateQRCode(event) {
+            event.preventDefault();
+
+            const qrType = document.getElementById('qr-type');
+            const type = qrType.value;
+            const config = CONTENT_TYPES[type];
+            const qrSize = document.getElementById('qr-size').value || 250;
+            const downloadLink = document.getElementById('download-link');
+            const qrResultDiv = document.getElementById('qr-result');
+            const errorMessage = document.getElementById('error-message');
+            
+            if (!config || type === '') return;
+
+            // 1. Coleta os dados do formulário
+            const formData = {};
+            let allRequiredFilled = true;
+
+            config.fields.forEach(field => {
+                const inputElement = document.getElementById(field.name);
+                if (inputElement) {
+                    formData[field.name] = inputElement.value.trim();
+                    if (field.required && !formData[field.name]) {
+                        allRequiredFilled = false;
+                    }
+                }
+            });
+
+            // 2. Validação e Exibição de Erro
+            if (!allRequiredFilled) {
+                errorMessage.textContent = "Por favor, preencha todos os campos obrigatórios (*).";
+                errorMessage.classList.remove('hidden');
+                downloadLink.classList.add('hidden');
+                qrResultDiv.innerHTML = '<p class="text-red-500 text-center text-sm">Preencha os campos obrigatórios.</p>';
+                return;
+            }
+            errorMessage.classList.add('hidden');
+
+
+            // 3. Formata os dados no padrão do QR Code (Data String)
+            let dataString = config.formatter(formData);
+
+            // 4. Cria a URL final da API
+            const encodedData = encodeURIComponent(dataString);
+            const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodedData}&size=${qrSize}x${qrSize}&ecc=L&bgcolor=ffffff`;
+            
+            // 5. Exibe a imagem no resultado (adiciona timestamp para evitar cache)
+            const qrImageUrlWithCacheBuster = `${apiUrl}&t=${Date.now()}`;
+            
+            const imageHtml = `<img src="${qrImageUrlWithCacheBuster}" alt="QR Code Gerado" class="mx-auto rounded-lg shadow-xl border border-gray-100" style="width: ${qrSize}px; height: ${qrSize}px;" onerror="handleImageError()">`;
+            
+            qrResultDiv.innerHTML = imageHtml;
+            
+            // 6. Prepara o link de download
+            downloadQRCode(apiUrl, `qrcode_${type}.png`);
+        }
+
+        /**
+         * Função de fallback em caso de erro no carregamento da imagem (ex: dados muito longos)
+         */
+        function handleImageError() {
+            const qrResultDiv = document.getElementById('qr-result');
+            const downloadLink = document.getElementById('download-link');
+             qrResultDiv.innerHTML = `
+                <div class="text-red-500 text-center p-4">
+                    <p class="font-bold mb-2">❌ Erro ao Gerar QR Code</p>
+                    <p class="text-sm">Os dados fornecidos são muito longos ou estão em um formato incorreto para o tipo selecionado.</p>
+                </div>
+            `;
+            downloadLink.classList.add('hidden');
+        }
+
+        /**
+         * Manipula a mudança no tipo de QR Code (função principal de injeção de campos).
+         * Esta função agora é chamada diretamente pelo atributo 'onchange' no HTML.
+         */
+        function handleTypeChange() {
+             try {
+                // Referências de elementos
+                const qrTypeSelect = document.getElementById('qr-type');
+                const dynamicFieldsDiv = document.getElementById('dynamic-fields');
+                const explanationBox = document.getElementById('explanation-box');
+                const explanationText = document.getElementById('explanation-text');
+                const generateButton = document.getElementById('generate-button');
+                const qrResultDiv = document.getElementById('qr-result');
+                const errorMessage = document.getElementById('error-message');
+
+                const type = qrTypeSelect.value;
+                const config = CONTENT_TYPES[type];
+
+                errorMessage.classList.add('hidden');
+                document.getElementById('download-link').classList.add('hidden');
+
+                if (config) {
+                    // Atualiza a explicação
+                    explanationText.textContent = config.explanation;
+                    explanationBox.classList.remove('hidden');
+                    
+                    // Geração e injeção dos campos
+                    dynamicFieldsDiv.innerHTML = generateFieldsHTML(type);
+                    generateButton.disabled = false;
+                } else {
+                    // Estado inicial/Inválido
+                    explanationBox.classList.add('hidden');
+                    dynamicFieldsDiv.innerHTML = '<p class="text-gray-500 text-sm italic">Selecione um tipo de conteúdo acima para carregar os campos de preenchimento.</p>';
+                    generateButton.disabled = true;
+                    qrResultDiv.innerHTML = '<p class="text-gray-500 text-center text-sm">O QR Code gerado aparecerá aqui.</p>';
+                }
+            } catch (error) {
+                // Se o problema persistir, registramos o erro no console, mas o código acima é o mais robusto.
+                console.error("ERRO CRÍTICO na injeção dinâmica:", error);
+                document.getElementById('error-message').textContent = "ERRO INTERNO: Falha ao carregar os campos. Verifique o console.";
+                document.getElementById('error-message').classList.remove('hidden');
+            }
+        }
+
+        // Chamada inicial para configurar o estado padrão.
+        handleTypeChange();
+    </script>
+
+</body>
+</html>
+
