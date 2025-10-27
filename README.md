@@ -40,9 +40,12 @@ Este projeto é uma ferramenta web de código aberto para criação de QR Codes 
 ---
 
 ## 🧩 Estrutura do Projeto
+
+```
 qr-code-generator-js/
 ├── index.html    
 └── README.md
+```
 
 ---
 
