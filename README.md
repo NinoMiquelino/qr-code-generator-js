@@ -12,7 +12,7 @@
 
 # 📲 Gerador Dinâmico de QR Codes (vCard, PIX, Wi-Fi)
 
-![JavaScript](https://img.shields.io/badge/Frontend-JavaScript-F7DF1E?logo=javascript&logoColor=black)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-38B2AC?logo=tailwindcss&logoColor=white)
 ![License MIT](https://img.shields.io/badge/License-MIT-green)
 ![Status Stable](https://img.shields.io/badge/Status-Stable-success)
